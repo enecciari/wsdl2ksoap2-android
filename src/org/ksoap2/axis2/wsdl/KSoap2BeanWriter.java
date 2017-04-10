@@ -274,7 +274,7 @@ public class KSoap2BeanWriter implements BeanWriter {
 			BeanWriterMetaInfoHolder metaInfo) {
 		Element root;
 		if (metaInfo.isExtension()) {
-			root = XSLTUtils.getElement(model, "extendingClass");
+			root = XSLTUtils.getElement(model, "class");
 		} else if (metaInfo.getEnumFacet().size() > 0) {
 			root = XSLTUtils.getElement(model, "enum");
 		} else {
@@ -286,6 +286,8 @@ public class KSoap2BeanWriter implements BeanWriter {
 		XSLTUtils.addAttribute(model, "nsUri", nsUir, root);
 		if (metaInfo.isExtension()) {
 			XSLTUtils.addAttribute(model, "extends", metaInfo.getExtensionClassName(), root);
+
+			writeUsualClass(model,className,originalName,packageName,nsUir,metaInfo,root);
 		} else if (metaInfo.getEnumFacet().size() > 0) {
 			// enum
 			for (String enumValue : metaInfo.getEnumFacet()) {
@@ -293,121 +295,127 @@ public class KSoap2BeanWriter implements BeanWriter {
 			}
 		} else {
 			// usual class
-			int attributeCount = 0;
-			int simpleFieldCount = 0;
-			QName[] fieldQNames = metaInfo.isOrdered() ? metaInfo.getOrderedQNameArray() : metaInfo.getQNameArray();
-			if (metaInfo.isSimple()) {
-				// simple type (one property + attributes)
-				XSLTUtils.addAttribute(model, "simple", "true", root);
-				for (int i = 0; i < fieldQNames.length; ++i) {
-					if (isAny(metaInfo, fieldQNames[i])) {
-						log.warn("Skip 'anytype' field " + packageName + "." + className + "." + fieldQNames[i].getLocalPart());
-					} else {
-						Element field = XSLTUtils.addChildElement(model, "field", root);
-						XSLTUtils.addAttribute(model, "originalName", i > 0 ? fieldQNames[i].getLocalPart() : "value", field);
-						XSLTUtils.addAttribute(model, "name", i > 0 ?
-							JavaClassWriterUtils.makeJavaIdentifier(fieldQNames[i].getLocalPart()) : "value", field);
-						XSLTUtils.addAttribute(model, "capitalizedName",
-							i > 0 ? JavaClassWriterUtils.makeCapitalizedJavaIdentifier(fieldQNames[i].getLocalPart()) : "Value", field);
-						String typeName = JavaClassWriterUtils.mapTypeName(metaInfo.getClassNameForQName(fieldQNames[i]));
-						XSLTUtils.addAttribute(model, "typeName", typeName, field);
-						String baseTypeName = JavaClassWriterUtils.getBaseType(typeName);
-						String simpleTypeName = JavaClassWriterUtils.getSimpleClassName(baseTypeName);
-						if ("java.util.Calendar".equals(typeName) || "javax.xml.namespace.QName".equals(typeName)) {
-							XSLTUtils.addAttribute(model, "wrapperTypeName", simpleTypeName, field);
-						}
-						if (JavaClassWriterUtils.isPrimitiveType(baseTypeName)) {
-							XSLTUtils.addAttribute(model, "primitive", "true", field);
-							XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getWrapperClassName(baseTypeName),
-								field);
-						}
-						if (JavaClassWriterUtils.isWrapperType(baseTypeName)) {
-							XSLTUtils.addAttribute(model, "wrapperType", "true", field);
-							XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getSimpleClassName(baseTypeName),
-								field);
-						}
-						if (isEnum(metaInfo.getSchemaQNameForQName(fieldQNames[i]), simpleTypeName)) {
-							XSLTUtils.addAttribute(model, "enum", "true", field);
-						}
-						if (metaInfo.getAttributeStatusForQName(fieldQNames[i])) {
-							// attribute field
-							attributeCount++;
-							XSLTUtils.addAttribute(model, "attribute",  "true", field);
-							if (metaInfo.getOptionalAttributeStatusForQName(fieldQNames[i])) {
-								XSLTUtils.addAttribute(model, "optional",  "true", field);
-							}
-						} else {
-							// property field
-							if (metaInfo.getArrayStatusForQName(fieldQNames[i])) {
-								XSLTUtils.addAttribute(model, "array",  "true", field);
-								XSLTUtils.addAttribute(model, "baseTypeName", JavaClassWriterUtils.getBaseType(typeName), field);
-							}
-							XSLTUtils.addAttribute(model, "nsUri", fieldQNames[i].getNamespaceURI(), field);
-							if (metaInfo.getMinOccurs(fieldQNames[i]) == 0) {
-								XSLTUtils.addAttribute(model, "optional",  "true", field);
-							}
-						}
+			writeUsualClass(model,className,originalName,packageName,nsUir,metaInfo,root);
+		}
+//		System.out.println(com.ibm.wsdl.util.xml.DOM2Writer.nodeToString(root));
+		return root;
+	}
+	
+	private void writeUsualClass(Document model, String className, String originalName, String packageName, String nsUir,
+			BeanWriterMetaInfoHolder metaInfo,Element root){
+		int attributeCount = 0;
+		int simpleFieldCount = 0;
+		QName[] fieldQNames = metaInfo.isOrdered() ? metaInfo.getOrderedQNameArray() : metaInfo.getQNameArray();
+		if (metaInfo.isSimple()) {
+			// simple type (one property + attributes)
+			XSLTUtils.addAttribute(model, "simple", "true", root);
+			for (int i = 0; i < fieldQNames.length; ++i) {
+				if (isAny(metaInfo, fieldQNames[i])) {
+					log.warn("Skip 'anytype' field " + packageName + "." + className + "." + fieldQNames[i].getLocalPart());
+				} else {
+					Element field = XSLTUtils.addChildElement(model, "field", root);
+					XSLTUtils.addAttribute(model, "originalName", i > 0 ? fieldQNames[i].getLocalPart() : "value", field);
+					XSLTUtils.addAttribute(model, "name", i > 0 ?
+						JavaClassWriterUtils.makeJavaIdentifier(fieldQNames[i].getLocalPart()) : "value", field);
+					XSLTUtils.addAttribute(model, "capitalizedName",
+						i > 0 ? JavaClassWriterUtils.makeCapitalizedJavaIdentifier(fieldQNames[i].getLocalPart()) : "Value", field);
+					String typeName = JavaClassWriterUtils.mapTypeName(metaInfo.getClassNameForQName(fieldQNames[i]));
+					XSLTUtils.addAttribute(model, "typeName", typeName, field);
+					String baseTypeName = JavaClassWriterUtils.getBaseType(typeName);
+					String simpleTypeName = JavaClassWriterUtils.getSimpleClassName(baseTypeName);
+					if ("java.util.Calendar".equals(typeName) || "javax.xml.namespace.QName".equals(typeName)) {
+						XSLTUtils.addAttribute(model, "wrapperTypeName", simpleTypeName, field);
 					}
-				}
-			} else {
-				// complex type (properties + attributes)
-				for (QName fieldQNname : fieldQNames) {
-					if (isAny(metaInfo, fieldQNname)) {
-						log.warn("Skip 'anytype' field " + packageName + "." + className + "." + fieldQNname.getLocalPart());
-					} else {
-						Element field = XSLTUtils.addChildElement(model, "field", root);
-						XSLTUtils.addAttribute(model, "originalName", fieldQNname.getLocalPart(), field);
-						XSLTUtils.addAttribute(model, "name", JavaClassWriterUtils.makeJavaIdentifier(fieldQNname.getLocalPart()),
+					if (JavaClassWriterUtils.isPrimitiveType(baseTypeName)) {
+						XSLTUtils.addAttribute(model, "primitive", "true", field);
+						XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getWrapperClassName(baseTypeName),
 							field);
-						XSLTUtils.addAttribute(model, "capitalizedName",
-							JavaClassWriterUtils.makeCapitalizedJavaIdentifier(fieldQNname.getLocalPart()), field);
-						String typeName = JavaClassWriterUtils.mapTypeName(metaInfo.getClassNameForQName(fieldQNname));
-						XSLTUtils.addAttribute(model, "typeName", typeName, field);
-						String baseTypeName = JavaClassWriterUtils.getBaseType(typeName);
-						String simpleTypeName = JavaClassWriterUtils.getSimpleClassName(baseTypeName);
-						if ("java.util.Calendar".equals(typeName) || "javax.xml.namespace.QName".equals(typeName)) {
-							XSLTUtils.addAttribute(model, "wrapperTypeName", simpleTypeName, field);
+					}
+					if (JavaClassWriterUtils.isWrapperType(baseTypeName)) {
+						XSLTUtils.addAttribute(model, "wrapperType", "true", field);
+						XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getSimpleClassName(baseTypeName),
+							field);
+					}
+					if (isEnum(metaInfo.getSchemaQNameForQName(fieldQNames[i]), simpleTypeName)) {
+						XSLTUtils.addAttribute(model, "enum", "true", field);
+					}
+					if (metaInfo.getAttributeStatusForQName(fieldQNames[i])) {
+						// attribute field
+						attributeCount++;
+						XSLTUtils.addAttribute(model, "attribute",  "true", field);
+						if (metaInfo.getOptionalAttributeStatusForQName(fieldQNames[i])) {
+							XSLTUtils.addAttribute(model, "optional",  "true", field);
 						}
-						if (JavaClassWriterUtils.isPrimitiveType(baseTypeName)) {
-							XSLTUtils.addAttribute(model, "primitive", "true", field);
-							XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getWrapperClassName(baseTypeName),
-								field);
+					} else {
+						// property field
+						if (metaInfo.getArrayStatusForQName(fieldQNames[i])) {
+							XSLTUtils.addAttribute(model, "array",  "true", field);
+							XSLTUtils.addAttribute(model, "baseTypeName", JavaClassWriterUtils.getBaseType(typeName), field);
 						}
-						if (JavaClassWriterUtils.isWrapperType(baseTypeName)) {
-							XSLTUtils.addAttribute(model, "wrapperType", "true", field);
-							XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getSimpleClassName(baseTypeName),
-								field);
-						}
-						if (isEnum(metaInfo.getSchemaQNameForQName(fieldQNname), simpleTypeName)) {
-							XSLTUtils.addAttribute(model, "enum", "true", field);
-						}
-						if (metaInfo.getAttributeStatusForQName(fieldQNname)) {
-							// attribute field
-							attributeCount++;
-							XSLTUtils.addAttribute(model, "attribute",  "true", field);
-							if (metaInfo.getOptionalAttributeStatusForQName(fieldQNname)) {
-								XSLTUtils.addAttribute(model, "optional",  "true", field);
-							}
-						} else {
-							// property field
-							if (metaInfo.getArrayStatusForQName(fieldQNname)) {
-								XSLTUtils.addAttribute(model, "array",  "true", field);
-								XSLTUtils.addAttribute(model, "baseTypeName", baseTypeName, field);
-							} else {
-								simpleFieldCount++;
-							}
-							XSLTUtils.addAttribute(model, "nsUri", fieldQNname.getNamespaceURI(), field);
-							if (metaInfo.getMinOccurs(fieldQNname) == 0) {
-								XSLTUtils.addAttribute(model, "optional",  "true", field);
-							}
+						XSLTUtils.addAttribute(model, "nsUri", fieldQNames[i].getNamespaceURI(), field);
+						if (metaInfo.getMinOccurs(fieldQNames[i]) == 0) {
+							XSLTUtils.addAttribute(model, "optional",  "true", field);
 						}
 					}
 				}
 			}
-			XSLTUtils.addAttribute(model, "attributeCount", String.valueOf(attributeCount), root);
-			XSLTUtils.addAttribute(model, "simpleFieldCount", String.valueOf(simpleFieldCount), root);
+		} else {
+			// complex type (properties + attributes)
+			for (QName fieldQNname : fieldQNames) {
+				if (isAny(metaInfo, fieldQNname)) {
+					log.warn("Skip 'anytype' field " + packageName + "." + className + "." + fieldQNname.getLocalPart());
+				} else {
+					Element field = XSLTUtils.addChildElement(model, "field", root);
+					XSLTUtils.addAttribute(model, "originalName", fieldQNname.getLocalPart(), field);
+					XSLTUtils.addAttribute(model, "name", JavaClassWriterUtils.makeJavaIdentifier(fieldQNname.getLocalPart()),
+						field);
+					XSLTUtils.addAttribute(model, "capitalizedName",
+						JavaClassWriterUtils.makeCapitalizedJavaIdentifier(fieldQNname.getLocalPart()), field);
+					String typeName = JavaClassWriterUtils.mapTypeName(metaInfo.getClassNameForQName(fieldQNname));
+					XSLTUtils.addAttribute(model, "typeName", typeName, field);
+					String baseTypeName = JavaClassWriterUtils.getBaseType(typeName);
+					String simpleTypeName = JavaClassWriterUtils.getSimpleClassName(baseTypeName);
+					if ("java.util.Calendar".equals(typeName) || "javax.xml.namespace.QName".equals(typeName)) {
+						XSLTUtils.addAttribute(model, "wrapperTypeName", simpleTypeName, field);
+					}
+					if (JavaClassWriterUtils.isPrimitiveType(baseTypeName)) {
+						XSLTUtils.addAttribute(model, "primitive", "true", field);
+						XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getWrapperClassName(baseTypeName),
+							field);
+					}
+					if (JavaClassWriterUtils.isWrapperType(baseTypeName)) {
+						XSLTUtils.addAttribute(model, "wrapperType", "true", field);
+						XSLTUtils.addAttribute(model, "wrapperTypeName", JavaClassWriterUtils.getSimpleClassName(baseTypeName),
+							field);
+					}
+					if (isEnum(metaInfo.getSchemaQNameForQName(fieldQNname), simpleTypeName)) {
+						XSLTUtils.addAttribute(model, "enum", "true", field);
+					}
+					if (metaInfo.getAttributeStatusForQName(fieldQNname)) {
+						// attribute field
+						attributeCount++;
+						XSLTUtils.addAttribute(model, "attribute",  "true", field);
+						if (metaInfo.getOptionalAttributeStatusForQName(fieldQNname)) {
+							XSLTUtils.addAttribute(model, "optional",  "true", field);
+						}
+					} else {
+						// property field
+						if (metaInfo.getArrayStatusForQName(fieldQNname)) {
+							XSLTUtils.addAttribute(model, "array",  "true", field);
+							XSLTUtils.addAttribute(model, "baseTypeName", baseTypeName, field);
+						} else {
+							simpleFieldCount++;
+						}
+						XSLTUtils.addAttribute(model, "nsUri", fieldQNname.getNamespaceURI(), field);
+						if (metaInfo.getMinOccurs(fieldQNname) == 0) {
+							XSLTUtils.addAttribute(model, "optional",  "true", field);
+						}
+					}
+				}
+			}
 		}
-//		System.out.println(com.ibm.wsdl.util.xml.DOM2Writer.nodeToString(root));
-		return root;
+
+		XSLTUtils.addAttribute(model, "attributeCount", String.valueOf(attributeCount), root);
+		XSLTUtils.addAttribute(model, "simpleFieldCount", String.valueOf(simpleFieldCount), root);
 	}
 }
